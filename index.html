@@ -1,492 +1,430 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>로스트아크 레이드 투표</title>
-<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
-<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: #07090f; font-family: 'Noto Sans KR', sans-serif; }
-  input, button { font-family: inherit; }
-  ::-webkit-scrollbar { width: 6px; }
-  ::-webkit-scrollbar-track { background: #0e1422; }
-  ::-webkit-scrollbar-thumb { background: #1c2540; border-radius: 3px; }
-</style>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>로스트아크 레이드 투표</title>
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+    
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #07090f; font-family: 'Noto Sans KR', sans-serif; }
+        input, button { font-family: inherit; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #0e1422; }
+        ::-webkit-scrollbar-thumb { background: #1c2540; border-radius: 3px; }
+    </style>
 </head>
 <body>
-<div id="root"></div>
-<script type="text/babel">
-const { useState, useEffect, useRef } = React;
+    <div id="root"></div>
 
-// ================================================================
-// ⚙️  여기에 본인의 Firebase 설정을 붙여넣으세요
-// ================================================================
-// Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
 
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
-const firebaseConfig = {
-  apiKey: "AIzaSyDkPqIMe-0h2aKzVKhtvh9E1DMk2n1pmkI",
-  authDomain: "lostark-raid-vote.firebaseapp.com",
-  projectId: "lostark-raid-vote",
-  storageBucket: "lostark-raid-vote.firebasestorage.app",
-  messagingSenderId: "29701678209",
-  appId: "1:29701678209:web:817ad840307e3334f9d980",
-  measurementId: "G-479467WLW7"
-};
+        // ================================================================
+        // ⚙️ Firebase 설정 완료됨
+        // ================================================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyDkPqIMe-0h2aKzVKhtvh9E1DMk2n1pmkI",
+            authDomain: "lostark-raid-vote.firebaseapp.com",
+            projectId: "lostark-raid-vote",
+            storageBucket: "lostark-raid-vote.firebasestorage.app",
+            messagingSenderId: "29701678209",
+            appId: "1:29701678209:web:817ad840307e3334f9d980",
+            measurementId: "G-479467WLW7"
+        };
+        // ================================================================
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
-// ================================================================
+        const IS_CONFIGURED = firebaseConfig.apiKey !== "YOUR_API_KEY";
+        let db = null;
+        if (IS_CONFIGURED) {
+            if (!firebase.apps.length) {
+                firebase.initializeApp(firebaseConfig);
+            }
+            db = firebase.firestore();
+        }
 
-const IS_CONFIGURED = firebaseConfig.apiKey !== "AIzaSyDkPqIMe-0h2aKzVKhtvh9E1DMk2n1pmkI";
-let db = null;
-if (IS_CONFIGURED) {
-  firebase.initializeApp(firebaseConfig);
-  db = firebase.firestore();
-}
+        const DAY_KR = ['일','월','화','수','목','금','토'];
+        const MON_KR = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+        const G = {
+            bg:'#07090f', card:'#0e1422', cardB:'#1c2540', gold:'#c8a84b', goldL:'#e8ca70',
+            goldD:'#8a7030', text:'#ddd5c0', sub:'#6a7a90', accent:'#162040',
+            green:'#3a8a3a', greenL:'#5abf5a', greenBg:'#0a1a0a',
+        };
 
-const DAY_KR = ['일','월','화','수','목','금','토'];
-const MON_KR = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
-const G = {
-  bg:'#07090f', card:'#0e1422', cardB:'#1c2540', gold:'#c8a84b', goldL:'#e8ca70',
-  goldD:'#8a7030', text:'#ddd5c0', sub:'#6a7a90', accent:'#162040',
-  green:'#3a8a3a', greenL:'#5abf5a', greenBg:'#0a1a0a',
-};
+        function getMonday(now = new Date()) {
+            const d = new Date(now), day = d.getDay(), m = new Date(d);
+            if (day === 0) m.setDate(d.getDate() - 6);
+            else if (day === 1) { if (d.getHours() < 10) m.setDate(d.getDate() - 7); }
+            else m.setDate(d.getDate() - (day - 1));
+            m.setHours(0, 0, 0, 0);
+            return m;
+        }
 
-function getMonday(now = new Date()) {
-  const d = new Date(now), day = d.getDay(), m = new Date(d);
-  if (day === 0) m.setDate(d.getDate() - 6);
-  else if (day === 1) { if (d.getHours() < 10) m.setDate(d.getDate() - 7); }
-  else m.setDate(d.getDate() - (day - 1));
-  m.setHours(0, 0, 0, 0);
-  return m;
-}
-function getRaidDates(mon) {
-  return [2,3,4,5,6,7,8].map(i => { const d = new Date(mon); d.setDate(mon.getDate()+i); return d; });
-}
-function fmt(d) { return d.toISOString().split('T')[0]; }
-function timeAgo(ts) {
-  const diff = Date.now() - ts;
-  const m = Math.floor(diff/60000), h = Math.floor(diff/3600000), day = Math.floor(diff/86400000);
-  if (diff < 60000) return '방금 전';
-  if (h < 1) return `${m}분 전`;
-  if (day < 1) return `${h}시간 전`;
-  return `${day}일 전`;
-}
+        function getRaidDates(mon) {
+            return [2,3,4,5,6,7,8].map(i => { const d = new Date(mon); d.setDate(mon.getDate()+i); return d; });
+        }
 
-// Firebase가 설정되지 않은 경우 안내 화면
-function NotConfigured() {
-  return (
-    <div style={{minHeight:'100vh',background:G.bg,display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
-      <div style={{background:G.card,border:`1px solid ${G.gold}`,borderRadius:14,padding:32,maxWidth:480,textAlign:'center'}}>
-        <div style={{fontSize:32,marginBottom:12}}>⚙️</div>
-        <h2 style={{color:G.goldL,marginBottom:12,fontSize:20}}>Firebase 설정이 필요합니다</h2>
-        <p style={{color:G.sub,fontSize:14,lineHeight:1.8,marginBottom:20}}>
-          <code style={{background:'#111',padding:'2px 6px',borderRadius:4,color:G.gold}}>index.html</code> 파일 상단의<br/>
-          <code style={{background:'#111',padding:'2px 6px',borderRadius:4,color:G.gold}}>firebaseConfig</code> 값을<br/>
-          본인의 Firebase 프로젝트 정보로 교체해 주세요.
-        </p>
-        <div style={{background:'#070b14',border:`1px solid ${G.cardB}`,borderRadius:8,padding:14,textAlign:'left',fontSize:12,color:G.sub,lineHeight:2}}>
-          1. <a href="https://console.firebase.google.com" target="_blank" style={{color:G.goldL}}>console.firebase.google.com</a> 접속<br/>
-          2. 프로젝트 생성 → 웹 앱 추가<br/>
-          3. Firestore Database 생성 (테스트 모드)<br/>
-          4. 발급된 config 값을 파일에 붙여넣기
-        </div>
-      </div>
-    </div>
-  );
-}
+        function fmt(d) { return d.toISOString().split('T')[0]; }
 
-function App() {
-  const [raidName, setRaidName] = useState('카양겔 하드');
-  const [editName, setEditName] = useState(false);
-  const [tmpName, setTmpName] = useState('');
-  const [votes, setVotes] = useState({});
-  const [myName, setMyName] = useState('');
-  const [sel, setSel] = useState([]);
-  const [voted, setVoted] = useState(false);
-  const [tab, setTab] = useState('vote');
-  const [cd, setCd] = useState('');
-  const [comments, setComments] = useState([]);
-  const [cmtName, setCmtName] = useState('');
-  const [cmtText, setCmtText] = useState('');
-  const [cmtErr, setCmtErr] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [syncStatus, setSyncStatus] = useState('');
-  const syncTimer = useRef(null);
+        function timeAgo(ts) {
+            const diff = Date.now() - ts;
+            const m = Math.floor(diff/60000), h = Math.floor(diff/3600000), day = Math.floor(diff/86400000);
+            if (diff < 60000) return '방금 전';
+            if (h < 1) return `${m}분 전`;
+            if (day < 1) return `${h}시간 전`;
+            return `${day}일 전`;
+        }
 
-  const mon = getMonday();
-  const dates = getRaidDates(mon);
-  const wkey = fmt(mon);
-  const deadline = new Date(mon);
-  deadline.setDate(mon.getDate() + 1);
-  deadline.setHours(13, 0, 0, 0);
-  const isClosed = new Date() > deadline;
-
-  // 실시간 Firestore 리스너
-  useEffect(() => {
-    const unsubs = [];
-
-    unsubs.push(
-      db.collection('la_data').doc('settings')
-        .onSnapshot(doc => { if (doc.exists && doc.data().raidName) setRaidName(doc.data().raidName); })
-    );
-    unsubs.push(
-      db.collection('la_data').doc(`votes_${wkey}`)
-        .onSnapshot(doc => { setVotes(doc.exists ? (doc.data().data || {}) : {}); setLoading(false); },
-          () => setLoading(false))
-    );
-    unsubs.push(
-      db.collection('la_data').doc(`comments_${wkey}`)
-        .onSnapshot(doc => { setComments(doc.exists ? (doc.data().data || []) : []); })
-    );
-
-    return () => unsubs.forEach(u => u());
-  }, [wkey]);
-
-  // 카운트다운
-  useEffect(() => {
-    const tick = () => {
-      const diff = deadline - new Date();
-      if (diff <= 0) return setCd('투표 마감');
-      const d=Math.floor(diff/86400000), h=Math.floor((diff%86400000)/3600000);
-      const m=Math.floor((diff%3600000)/60000), s=Math.floor((diff%60000)/1000);
-      setCd(`${d>0?d+'일 ':''}${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')} 남음`);
-    };
-    tick(); const t = setInterval(tick, 1000); return () => clearInterval(t);
-  }, []);
-
-  function showSync(msg) {
-    setSyncStatus(msg);
-    clearTimeout(syncTimer.current);
-    syncTimer.current = setTimeout(() => setSyncStatus(''), 2000);
-  }
-
-  async function saveSettings(n) {
-    await db.collection('la_data').doc('settings').set({ raidName: n });
-  }
-  async function saveVotes(v) {
-    await db.collection('la_data').doc(`votes_${wkey}`).set({ data: v });
-    showSync('✅ 저장됨');
-  }
-  async function saveComments(c) {
-    await db.collection('la_data').doc(`comments_${wkey}`).set({ data: c });
-  }
-
-  const toggle = ds => { if (!isClosed) setSel(p => p.includes(ds) ? p.filter(x=>x!==ds) : [...p, ds]); };
-
-  async function doVote() {
-    if (!myName.trim() || !sel.length || isClosed) return;
-    const nv = {...votes, [myName.trim()]: sel};
-    setVoted(true); await saveVotes(nv);
-  }
-  function doEdit() { setSel(votes[myName.trim()]||[]); setVoted(false); }
-
-  async function doComment() {
-    if (!cmtName.trim()) { setCmtErr('닉네임을 입력해 주세요.'); return; }
-    if (!cmtText.trim()) { setCmtErr('내용을 입력해 주세요.'); return; }
-    setCmtErr('');
-    const nc = [...comments, { name: cmtName.trim(), text: cmtText.trim(), ts: Date.now() }];
-    setCmtText(''); await saveComments(nc);
-  }
-  async function deleteComment(idx) {
-    await saveComments(comments.filter((_,i) => i !== idx));
-  }
-
-  const counts = {};
-  dates.forEach(d => { counts[fmt(d)] = []; });
-  Object.entries(votes).forEach(([nm,ds]) => ds.forEach(d => { if (counts[d]) counts[d].push(nm); }));
-  const maxC = Math.max(...Object.values(counts).map(v=>v.length), 1);
-  const bestDs = Object.entries(counts).filter(([,v])=>v.length===maxC&&v.length>0).map(([d])=>d);
-  const total = Object.keys(votes).length;
-  const nameVoted = myName.trim() && votes[myName.trim()];
-
-  const card = (extra={}) => ({
-    background:G.card, border:`1px solid ${G.cardB}`, borderRadius:12, padding:18, marginBottom:14, ...extra
-  });
-
-  if (loading) return (
-    <div style={{minHeight:'100vh',background:G.bg,display:'flex',alignItems:'center',justifyContent:'center',color:G.gold,fontSize:16}}>
-      <div style={{textAlign:'center'}}>
-        <div style={{fontSize:32,marginBottom:12}}>⚔</div>
-        <div>불러오는 중...</div>
-      </div>
-    </div>
-  );
-
-  return (
-    <div style={{minHeight:'100vh',background:G.bg,color:G.text,padding:'20px 14px'}}>
-      <div style={{maxWidth:600,margin:'0 auto'}}>
-
-        {/* 동기화 상태 토스트 */}
-        {syncStatus && (
-          <div style={{position:'fixed',top:16,right:16,background:'#0d2a0d',border:'1px solid #2a6a2a',
-            borderRadius:9,padding:'8px 16px',fontSize:13,color:G.greenL,zIndex:999}}>
-            {syncStatus}
-          </div>
-        )}
-
-        {/* Header */}
-        <div style={{textAlign:'center',marginBottom:22}}>
-          <div style={{fontSize:11,color:G.sub,letterSpacing:3,marginBottom:10}}>LOST ARK RAID SCHEDULE</div>
-          {editName ? (
-            <div style={{display:'flex',gap:8,justifyContent:'center',alignItems:'center',flexWrap:'wrap'}}>
-              <input value={tmpName} onChange={e=>setTmpName(e.target.value)}
-                onKeyDown={e=>{if(e.key==='Enter'){setRaidName(tmpName);saveSettings(tmpName);setEditName(false);}}}
-                autoFocus style={{background:'#111827',border:`1.5px solid ${G.gold}`,color:G.text,
-                padding:'8px 14px',borderRadius:9,fontSize:20,fontWeight:'bold',textAlign:'center',outline:'none',width:240}}/>
-              <button style={{background:G.gold,color:'#000',border:'none',borderRadius:9,cursor:'pointer',fontWeight:'bold',padding:'8px 16px',fontSize:14}}
-                onClick={()=>{setRaidName(tmpName);saveSettings(tmpName);setEditName(false);}}>저장</button>
-              <button style={{background:G.cardB,color:G.sub,border:'none',borderRadius:9,cursor:'pointer',padding:'8px 14px',fontSize:14}}
-                onClick={()=>setEditName(false)}>취소</button>
-            </div>
-          ) : (
-            <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10}}>
-              <h1 style={{margin:0,fontSize:24,color:G.goldL,fontWeight:'bold'}}>⚔ {raidName}</h1>
-              <button onClick={()=>{setTmpName(raidName);setEditName(true);}}
-                style={{background:'transparent',border:`1px solid ${G.cardB}`,color:G.sub,padding:'4px 10px',fontSize:12,borderRadius:7,cursor:'pointer'}}>
-                ✏ 수정
-              </button>
-            </div>
-          )}
-          <div style={{display:'flex',flexWrap:'wrap',gap:8,justifyContent:'center',marginTop:12}}>
-            <span style={{background:'#0d1e0d',border:'1px solid #1e4a1e',padding:'5px 14px',borderRadius:20,fontSize:12,color:'#5abf5a'}}>
-              📅 {MON_KR[mon.getMonth()]} {mon.getDate()}일 주차
-            </span>
-            <span style={{background:isClosed?'#1a0a0a':'#0d0e20',border:`1px solid ${isClosed?'#4a1e1e':'#1e204a'}`,
-              padding:'5px 14px',borderRadius:20,fontSize:12,color:isClosed?'#cf6060':'#5a7abf'}}>
-              {isClosed ? '🔒 투표 마감' : `⏱ ${cd}`}
-            </span>
-            <span style={{background:'#0a0d1a',border:'1px solid #1a2040',padding:'5px 14px',borderRadius:20,fontSize:12,color:'#5a6abf'}}>
-              🔴 실시간 연동
-            </span>
-          </div>
-          {!isClosed && (
-            <div style={{marginTop:8,fontSize:11,color:G.sub}}>
-              투표 마감: {MON_KR[deadline.getMonth()]} {deadline.getDate()}일 (화) 오후 1시
-            </div>
-          )}
-        </div>
-
-        {/* Tabs */}
-        <div style={{display:'flex',background:G.card,borderRadius:11,padding:4,marginBottom:18,border:`1px solid ${G.cardB}`}}>
-          {[['vote','🗳 투표하기'],['result',`📊 결과 (${total}명)`]].map(([t,label])=>(
-            <button key={t} onClick={()=>setTab(t)} style={{
-              flex:1,padding:'10px',borderRadius:8,border:'none',cursor:'pointer',fontSize:14,
-              background:tab===t?G.gold:'transparent',color:tab===t?'#000':G.sub,
-              fontWeight:tab===t?'bold':'normal',transition:'all 0.2s'
-            }}>{label}</button>
-          ))}
-        </div>
-
-        {/* VOTE TAB */}
-        {tab==='vote' && (
-          <div>
-            {isClosed && (
-              <div style={{...card({background:'#120808',border:'1px solid #4a1e1e'}),textAlign:'center',color:'#cf6060'}}>
-                🔒 이번 주 투표가 마감되었습니다. 결과 탭에서 확인해 주세요.
-              </div>
-            )}
-            {!isClosed && <>
-              <div style={card()}>
-                <div style={{fontSize:12,color:G.sub,marginBottom:8}}>닉네임</div>
-                <input value={myName} onChange={e=>{setMyName(e.target.value);setVoted(false);setSel([]);}}
-                  placeholder="게임 닉네임을 입력하세요" disabled={voted}
-                  style={{width:'100%',background:G.bg,border:`1.5px solid ${voted?G.cardB:G.accent}`,
-                    color:G.text,padding:'11px 13px',borderRadius:8,fontSize:15,outline:'none'}}/>
-                {nameVoted && !voted && (
-                  <div style={{marginTop:8,fontSize:12,color:G.gold}}>이미 투표한 닉네임입니다. 수정 후 다시 투표할 수 있어요.</div>
-                )}
-              </div>
-              {myName.trim() && !voted && (
-                <div style={card()}>
-                  <div style={{fontSize:12,color:G.sub,marginBottom:14}}>
-                    참여 가능한 날짜를 선택하세요 <span style={{color:G.gold}}>복수 선택 가능</span>
-                  </div>
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:9}}>
-                    {dates.map(d=>{
-                      const ds=fmt(d), isS=sel.includes(ds), wi=d.getDay(), isWe=wi===0||wi===6;
-                      return (
-                        <button key={ds} onClick={()=>toggle(ds)} style={{
-                          padding:'13px 10px',background:isS?'#0e2a0e':G.bg,
-                          border:`2px solid ${isS?G.green:G.cardB}`,borderRadius:10,cursor:'pointer',
-                          color:isS?G.greenL:isWe?'#cf7070':G.text,
-                          display:'flex',alignItems:'center',gap:10,textAlign:'left'}}>
-                          <span style={{fontSize:18,lineHeight:1}}>{isS?'☑':'☐'}</span>
-                          <div>
-                            <div style={{fontWeight:'bold',fontSize:15}}>{MON_KR[d.getMonth()]} {d.getDate()}일</div>
-                            <div style={{fontSize:12,opacity:0.7}}>({DAY_KR[wi]}요일)</div>
-                          </div>
-                          {counts[ds]?.length>0 && (
-                            <span style={{marginLeft:'auto',background:G.accent,borderRadius:12,padding:'2px 8px',fontSize:11,color:G.goldL}}>
-                              {counts[ds].length}명
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
+        function NotConfigured() {
+            return (
+                <div style={{minHeight:'100vh',background:G.bg,display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
+                    <div style={{background:G.card,border:`1px solid ${G.gold}`,borderRadius:14,padding:32,maxWidth:480,textAlign:'center'}}>
+                        <div style={{fontSize:32,marginBottom:12}}>⚙️</div>
+                        <h2 style={{color:G.goldL,marginBottom:12,fontSize:20}}>설정값이 정상적으로 적용되지 않았습니다</h2>
+                        <p style={{color:G.sub,fontSize:14,lineHeight:1.8,marginBottom:20}}>
+                            코드를 다시 확인해 주세요.
+                        </p>
+                    </div>
                 </div>
-              )}
-              {myName.trim() && !voted && (
-                <button onClick={doVote} disabled={!sel.length} style={{
-                  width:'100%',padding:'15px',borderRadius:11,fontSize:16,border:'none',
-                  background:sel.length?`linear-gradient(135deg,${G.goldD},${G.gold})`:'#1a1a2a',
-                  color:sel.length?'#000':'#444',cursor:sel.length?'pointer':'default',fontWeight:'bold'}}>
-                  {nameVoted?'✅ 투표 수정하기':'✅ 투표하기'}{sel.length>0?` (${sel.length}개 선택)`:''}
-                </button>
-              )}
-              {voted && (
-                <div style={{...card({background:G.greenBg,border:`1px solid ${G.green}`}),textAlign:'center'}}>
-                  <div style={{fontSize:28,marginBottom:6}}>🎉</div>
-                  <div style={{color:G.greenL,fontWeight:'bold',fontSize:17,marginBottom:6}}>투표 완료!</div>
-                  <div style={{color:G.sub,fontSize:13,marginBottom:14}}>{sel.length}개 날짜 선택됨 · 실시간으로 반영됐어요</div>
-                  <div style={{display:'flex',flexWrap:'wrap',gap:6,justifyContent:'center',marginBottom:16}}>
-                    {sel.sort().map(ds=>{const d=new Date(ds);return(
-                      <span key={ds} style={{background:'#1a3a1a',border:'1px solid #3a7a3a',borderRadius:20,
-                        padding:'4px 12px',fontSize:12,color:G.greenL}}>
-                        {MON_KR[d.getMonth()]} {d.getDate()}일 ({DAY_KR[d.getDay()]})
-                      </span>
-                    );})}
-                  </div>
-                  <button onClick={doEdit} style={{background:'transparent',border:`1px solid ${G.cardB}`,
-                    color:G.sub,padding:'8px 20px',borderRadius:8,cursor:'pointer',fontSize:13}}>✏ 수정하기</button>
-                </div>
-              )}
-            </>}
-          </div>
-        )}
+            );
+        }
 
-        {/* RESULT TAB */}
-        {tab==='result' && (
-          <div>
-            {total===0 ? (
-              <div style={{textAlign:'center',padding:48,color:G.sub,fontSize:14}}>아직 투표한 사람이 없습니다.</div>
-            ) : (<>
-              {bestDs.length>0 && (
-                <div style={{...card({background:'#0d180a',border:`1.5px solid ${G.gold}`}),textAlign:'center'}}>
-                  <div style={{fontSize:11,color:G.sub,marginBottom:8,letterSpacing:1}}>최다 득표</div>
-                  <div style={{display:'flex',flexWrap:'wrap',gap:8,justifyContent:'center'}}>
-                    {bestDs.map(ds=>{const d=new Date(ds);return(
-                      <span key={ds} style={{color:G.goldL,fontWeight:'bold',fontSize:17}}>
-                        🏆 {MON_KR[d.getMonth()]} {d.getDate()}일 ({DAY_KR[d.getDay()]}) — {maxC}표
-                      </span>
-                    );})}
-                  </div>
+        function App() {
+            const [raidName, setRaidName] = useState('카양겔 하드');
+            const [editName, setEditName] = useState(false);
+            const [tmpName, setTmpName] = useState('');
+            const [votes, setVotes] = useState({});
+            const [myName, setMyName] = useState('');
+            const [sel, setSel] = useState([]);
+            const [voted, setVoted] = useState(false);
+            const [tab, setTab] = useState('vote');
+            const [cd, setCd] = useState('');
+            const [comments, setComments] = useState([]);
+            const [cmtName, setCmtName] = useState('');
+            const [cmtText, setCmtText] = useState('');
+            const [cmtErr, setCmtErr] = useState('');
+            const [loading, setLoading] = useState(true);
+            const [syncStatus, setSyncStatus] = useState('');
+            const syncTimer = useRef(null);
+
+            const mon = getMonday();
+            const dates = getRaidDates(mon);
+            const wkey = fmt(mon);
+            const deadline = new Date(mon);
+            deadline.setDate(mon.getDate() + 1);
+            deadline.setHours(13, 0, 0, 0);
+
+            const isClosed = new Date() > deadline;
+
+            useEffect(() => {
+                if (!db) return;
+                const unsubs = [];
+                unsubs.push(
+                    db.collection('la_data').doc('settings')
+                        .onSnapshot(doc => { if (doc.exists && doc.data().raidName) setRaidName(doc.data().raidName); })
+                );
+                unsubs.push(
+                    db.collection('la_data').doc(`votes_${wkey}`)
+                        .onSnapshot(doc => { setVotes(doc.exists ? (doc.data().data || {}) : {}); setLoading(false); },
+                            () => setLoading(false))
+                );
+                unsubs.push(
+                    db.collection('la_data').doc(`comments_${wkey}`)
+                        .onSnapshot(doc => { setComments(doc.exists ? (doc.data().data || []) : []); })
+                );
+                return () => unsubs.forEach(u => u());
+            }, [wkey]);
+
+            useEffect(() => {
+                const tick = () => {
+                    const diff = deadline - new Date();
+                    if (diff <= 0) return setCd('투표 마감');
+                    const d=Math.floor(diff/86400000), h=Math.floor((diff%86400000)/3600000);
+                    const m=Math.floor((diff%3600000)/60000), s=Math.floor((diff%60000)/1000);
+                    setCd(`${d>0?d+'일 ':''}${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')} 남음`);
+                };
+                tick(); const t = setInterval(tick, 1000); return () => clearInterval(t);
+            }, []);
+
+            function showSync(msg) {
+                setSyncStatus(msg);
+                clearTimeout(syncTimer.current);
+                syncTimer.current = setTimeout(() => setSyncStatus(''), 2000);
+            }
+
+            async function saveSettings(n) {
+                await db.collection('la_data').doc('settings').set({ raidName: n });
+            }
+
+            async function saveVotes(v) {
+                await db.collection('la_data').doc(`votes_${wkey}`).set({ data: v });
+                showSync('✅ 저장됨');
+            }
+
+            async function saveComments(c) {
+                await db.collection('la_data').doc(`comments_${wkey}`).set({ data: c });
+            }
+
+            const toggle = ds => { if (!isClosed) setSel(p => p.includes(ds) ? p.filter(x=>x!==ds) : [...p, ds]); };
+
+            async function doVote() {
+                if (!myName.trim() || !sel.length || isClosed) return;
+                const nv = {...votes, [myName.trim()]: sel};
+                setVoted(true); await saveVotes(nv);
+            }
+
+            function doEdit() { setSel(votes[myName.trim()]||[]); setVoted(false); }
+
+            async function doComment() {
+                if (!cmtName.trim()) { setCmtErr('닉네임을 입력해 주세요.'); return; }
+                if (!cmtText.trim()) { setCmtErr('내용을 입력해 주세요.'); return; }
+                setCmtErr('');
+                const nc = [...comments, { name: cmtName.trim(), text: cmtText.trim(), ts: Date.now() }];
+                setCmtText(''); await saveComments(nc);
+            }
+
+            async function deleteComment(idx) {
+                await saveComments(comments.filter((_,i) => i !== idx));
+            }
+
+            const counts = {};
+            dates.forEach(d => { counts[fmt(d)] = []; });
+            Object.entries(votes).forEach(([nm,ds]) => ds.forEach(d => { if (counts[d]) counts[d].push(nm); }));
+
+            const maxC = Math.max(...Object.values(counts).map(v=>v.length), 1);
+            const bestDs = Object.entries(counts).filter(([,v])=>v.length===maxC&&v.length>0).map(([d])=>d);
+            const total = Object.keys(votes).length;
+            const nameVoted = myName.trim() && votes[myName.trim()];
+
+            const card = (extra={}) => ({
+                background:G.card, border:`1px solid ${G.cardB}`, borderRadius:12, padding:18, marginBottom:14, ...extra
+            });
+
+            if (loading) return (
+                <div style={{minHeight:'100vh',background:G.bg,display:'flex',alignItems:'center',justifyContent:'center',color:G.gold,fontSize:16}}>
+                    <div style={{textAlign:'center'}}>
+                        <div style={{fontSize:32,marginBottom:12}}>⚔</div>
+                        <div>데이터 연결 중...</div>
+                    </div>
                 </div>
-              )}
-              <div style={card()}>
-                <div style={{fontSize:12,color:G.sub,marginBottom:14}}>날짜별 투표 현황</div>
-                {dates.map(d=>{
-                  const ds=fmt(d), cnt=counts[ds].length, isBest=bestDs.includes(ds);
-                  const wi=d.getDay(), isWe=wi===0||wi===6;
-                  return(
-                    <div key={ds} style={{marginBottom:14}}>
-                      <div style={{display:'flex',justifyContent:'space-between',marginBottom:5}}>
-                        <span style={{fontSize:14,color:isBest?G.goldL:isWe?'#cf7070':G.text,fontWeight:isBest?'bold':'normal'}}>
-                          {isBest?'🏆 ':''}{MON_KR[d.getMonth()]} {d.getDate()}일 ({DAY_KR[wi]})
-                        </span>
-                        <span style={{fontSize:14,color:isBest?G.goldL:G.sub,fontWeight:isBest?'bold':'normal'}}>{cnt}명</span>
-                      </div>
-                      <div style={{background:'#111827',borderRadius:6,height:9,overflow:'hidden',marginBottom:5}}>
-                        <div style={{height:'100%',borderRadius:6,transition:'width 0.5s',
-                          background:isBest?`linear-gradient(90deg,${G.goldD},${G.goldL})`:'#1e3560',
-                          width:`${cnt/maxC*100}%`}}/>
-                      </div>
-                      {cnt>0 && (
-                        <div style={{display:'flex',flexWrap:'wrap',gap:4}}>
-                          {counts[ds].map(nm=>(
-                            <span key={nm} style={{background:G.accent,borderRadius:12,padding:'2px 9px',fontSize:11,color:G.sub}}>{nm}</span>
-                          ))}
+            );
+
+            return (
+                <div style={{minHeight:'100vh',background:G.bg,color:G.text,padding:'20px 14px'}}>
+                    <div style={{maxWidth:600,margin:'0 auto'}}>
+                        {syncStatus && (
+                            <div style={{position:'fixed',top:16,right:16,background:'#0d2a0d',border:'1px solid #2a6a2a',
+                                borderRadius:9,padding:'8px 16px',fontSize:13,color:G.greenL,zIndex:999}}>
+                                {syncStatus}
+                            </div>
+                        )}
+
+                        <div style={{textAlign:'center',marginBottom:22}}>
+                            <div style={{fontSize:11,color:G.sub,letterSpacing:3,marginBottom:10}}>LOST ARK RAID SCHEDULE</div>
+                            {editName ? (
+                                <div style={{display:'flex',gap:8,justifyContent:'center',alignItems:'center',flexWrap:'wrap'}}>
+                                    <input value={tmpName} onChange={e=>setTmpName(e.target.value)}
+                                        onKeyDown={e=>{if(e.key==='Enter'){setRaidName(tmpName);saveSettings(tmpName);setEditName(false);}}}
+                                        autoFocus style={{background:'#111827',border:`1.5px solid ${G.gold}`,color:G.text,
+                                        padding:'8px 14px',borderRadius:9,fontSize:20,fontWeight:'bold',textAlign:'center',outline:'none',width:240}}/>
+                                    <button style={{background:G.gold,color:'#000',border:'none',borderRadius:9,cursor:'pointer',fontWeight:'bold',padding:'8px 16px',fontSize:14}}
+                                        onClick={()=>{setRaidName(tmpName);saveSettings(tmpName);setEditName(false);}}>저장</button>
+                                    <button style={{background:G.cardB,color:G.sub,border:'none',borderRadius:9,cursor:'pointer',padding:'8px 14px',fontSize:14}}
+                                        onClick={()=>setEditName(false)}>취소</button>
+                                </div>
+                            ) : (
+                                <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10}}>
+                                    <h1 style={{margin:0,fontSize:24,color:G.goldL,fontWeight:'bold'}}>⚔ {raidName}</h1>
+                                    <button onClick={()=>{setTmpName(raidName);setEditName(true);}}
+                                        style={{background:'transparent',border:`1px solid ${G.cardB}`,color:G.sub,padding:'4px 10px',fontSize:12,borderRadius:7,cursor:'pointer'}}>
+                                        ✏ 수정
+                                    </button>
+                                </div>
+                            )}
+                            <div style={{display:'flex',flexWrap:'wrap',gap:8,justifyContent:'center',marginTop:12}}>
+                                <span style={{background:'#0d1e0d',border:'1px solid #1e4a1e',padding:'5px 14px',borderRadius:20,fontSize:12,color:'#5abf5a'}}>
+                                    📅 {MON_KR[mon.getMonth()]} {mon.getDate()}일 주차
+                                </span>
+                                <span style={{background:isClosed?'#1a0a0a':'#0d0e20',border:`1px solid ${isClosed?'#4a1e1e':'#1e204a'}`,
+                                    padding:'5px 14px',borderRadius:20,fontSize:12,color:isClosed?'#cf6060':'#5a7abf'}}>
+                                    {isClosed ? '🔒 투표 마감' : `⏱ ${cd}`}
+                                </span>
+                            </div>
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-              <div style={card()}>
-                <div style={{fontSize:12,color:G.sub,marginBottom:12}}>참여자 목록 ({total}명)</div>
-                {Object.entries(votes).map(([nm,ds])=>(
-                  <div key={nm} style={{display:'flex',alignItems:'flex-start',padding:'10px 0',
-                    borderBottom:`1px solid ${G.cardB}`,gap:10}}>
-                    <span style={{color:G.text,fontSize:14,minWidth:100,paddingTop:2}}>👤 {nm}</span>
-                    <div style={{display:'flex',flexWrap:'wrap',gap:5}}>
-                      {ds.sort().map(d=>{const dt=new Date(d);return(
-                        <span key={d} style={{background:'#0d1e0d',border:'1px solid #2a5a2a',borderRadius:12,
-                          padding:'3px 10px',fontSize:11,color:G.greenL}}>
-                          {MON_KR[dt.getMonth()]}{dt.getDate()}({DAY_KR[dt.getDay()]})
-                        </span>
-                      );})}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </>)}
 
-            {/* Comments */}
-            <div style={card({marginTop:4})}>
-              <div style={{fontSize:14,fontWeight:'bold',color:G.goldL,marginBottom:16}}>💬 의견 남기기</div>
-              <div style={{display:'flex',gap:8,marginBottom:10}}>
-                <input value={cmtName} onChange={e=>setCmtName(e.target.value)} placeholder="닉네임"
-                  style={{width:110,background:G.bg,border:`1px solid ${G.cardB}`,color:G.text,
-                    padding:'9px 11px',borderRadius:8,fontSize:13,outline:'none'}}/>
-                <input value={cmtText} onChange={e=>{setCmtText(e.target.value);setCmtErr('');}}
-                  onKeyDown={e=>{if(e.key==='Enter')doComment();}} placeholder="의견을 입력하세요"
-                  style={{flex:1,background:G.bg,border:`1px solid ${G.cardB}`,color:G.text,
-                    padding:'9px 11px',borderRadius:8,fontSize:13,outline:'none'}}/>
-                <button onClick={doComment} style={{background:G.gold,color:'#000',border:'none',
-                  borderRadius:8,padding:'9px 14px',cursor:'pointer',fontWeight:'bold',fontSize:13,whiteSpace:'nowrap'}}>
-                  등록
-                </button>
-              </div>
-              {cmtErr && <div style={{fontSize:12,color:'#cf6060',marginBottom:8}}>{cmtErr}</div>}
-              {comments.length===0 ? (
-                <div style={{textAlign:'center',padding:'20px 0',color:G.sub,fontSize:13}}>아직 작성된 의견이 없습니다.</div>
-              ) : (
-                <div style={{display:'flex',flexDirection:'column',gap:10,marginTop:4}}>
-                  {comments.map((c,i)=>(
-                    <div key={i} style={{background:G.bg,border:`1px solid ${G.cardB}`,borderRadius:9,padding:'12px 14px',
-                      display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8}}>
-                      <div style={{flex:1}}>
-                        <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:5}}>
-                          <span style={{fontSize:13,fontWeight:'bold',color:G.goldL}}>👤 {c.name}</span>
-                          <span style={{fontSize:11,color:G.sub}}>{timeAgo(c.ts)}</span>
+                        <div style={{display:'flex',background:G.card,borderRadius:11,padding:4,marginBottom:18,border:`1px solid ${G.cardB}`}}>
+                            {[['vote','🗳 투표하기'],['result',`📊 결과 (${total}명)`]].map(([t,label])=>(
+                                <button key={t} onClick={()=>setTab(t)} style={{
+                                    flex:1,padding:'10px',borderRadius:8,border:'none',cursor:'pointer',fontSize:14,
+                                    background:tab===t?G.gold:'transparent',color:tab===t?'#000':G.sub,
+                                    fontWeight:tab===t?'bold':'normal',transition:'all 0.2s'
+                                }}>{label}</button>
+                            ))}
                         </div>
-                        <div style={{fontSize:14,color:G.text,lineHeight:1.6}}>{c.text}</div>
-                      </div>
-                      <button onClick={()=>deleteComment(i)} title="삭제"
-                        style={{background:'transparent',border:'none',color:G.sub,cursor:'pointer',
-                          fontSize:16,padding:'0 2px',lineHeight:1,opacity:0.6}}>✕</button>
+
+                        {tab==='vote' && (
+                            <div>
+                                {isClosed && (
+                                    <div style={{...card({background:'#120808',border:'1px solid #4a1e1e'}),textAlign:'center',color:'#cf6060'}}>
+                                        🔒 이번 주 투표가 마감되었습니다. 결과 탭에서 확인해 주세요.
+                                    </div>
+                                )}
+                                {!isClosed && <>
+                                    <div style={card()}>
+                                        <div style={{fontSize:12,color:G.sub,marginBottom:8}}>닉네임</div>
+                                        <input value={myName} onChange={e=>{setMyName(e.target.value);setVoted(false);setSel([]);}}
+                                            placeholder="게임 닉네임을 입력하세요" disabled={voted}
+                                            style={{width:'100%',background:G.bg,border:`1.5px solid ${voted?G.cardB:G.accent}`,
+                                                color:G.text,padding:'11px 13px',borderRadius:8,fontSize:15,outline:'none'}}/>
+                                    </div>
+                                    {myName.trim() && !voted && (
+                                        <div style={card()}>
+                                            <div style={{fontSize:12,color:G.sub,marginBottom:14}}>참여 가능한 날짜를 선택하세요</div>
+                                            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:9}}>
+                                                {dates.map(d=>{
+                                                    const ds=fmt(d), isS=sel.includes(ds), wi=d.getDay(), isWe=wi===0||wi===6;
+                                                    return (
+                                                        <button key={ds} onClick={()=>toggle(ds)} style={{
+                                                            padding:'13px 10px',background:isS?'#0e2a0e':G.bg,
+                                                            border:`2px solid ${isS?G.green:G.cardB}`,borderRadius:10,cursor:'pointer',
+                                                            color:isS?G.greenL:isWe?'#cf7070':G.text,
+                                                            display:'flex',alignItems:'center',gap:10,textAlign:'left'}}>
+                                                            <span style={{fontSize:18,lineHeight:1}}>{isS?'☑':'☐'}</span>
+                                                            <div>
+                                                                <div style={{fontWeight:'bold',fontSize:15}}>{MON_KR[d.getMonth()]} {d.getDate()}일</div>
+                                                                <div style={{fontSize:12,opacity:0.7}}>({DAY_KR[wi]}요일)</div>
+                                                            </div>
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
+                                    {myName.trim() && !voted && (
+                                        <button onClick={doVote} disabled={!sel.length} style={{
+                                            width:'100%',padding:'15px',borderRadius:11,fontSize:16,border:'none',
+                                            background:sel.length?`linear-gradient(135deg,${G.goldD},${G.gold})`:'#1a1a2a',
+                                            color:sel.length?'#000':'#444',cursor:sel.length?'pointer':'default',fontWeight:'bold'}}>
+                                            {nameVoted?'✅ 투표 수정하기':'✅ 투표하기'}
+                                        </button>
+                                    )}
+                                    {voted && (
+                                        <div style={{...card({background:G.greenBg,border:`1px solid ${G.green}`}),textAlign:'center'}}>
+                                            <div style={{fontSize:28,marginBottom:6}}>🎉</div>
+                                            <div style={{color:G.greenL,fontWeight:'bold',fontSize:17,marginBottom:6}}>투표 완료!</div>
+                                            <button onClick={doEdit} style={{background:'transparent',border:`1px solid ${G.cardB}`,
+                                                color:G.sub,padding:'8px 20px',borderRadius:8,cursor:'pointer',fontSize:13}}>✏ 수정하기</button>
+                                        </div>
+                                    )}
+                                </>}
+                            </div>
+                        )}
+
+                        {tab==='result' && (
+                            <div>
+                                {total===0 ? (
+                                    <div style={{textAlign:'center',padding:48,color:G.sub,fontSize:14}}>아직 투표한 사람이 없습니다.</div>
+                                ) : (<>
+                                    {bestDs.length>0 && (
+                                        <div style={{...card({background:'#0d180a',border:`1.5px solid ${G.gold}`}),textAlign:'center'}}>
+                                            <div style={{fontSize:11,color:G.sub,marginBottom:8,letterSpacing:1}}>최다 득표</div>
+                                            <div style={{display:'flex',flexWrap:'wrap',gap:8,justifyContent:'center'}}>
+                                                {bestDs.map(ds=>{const d=new Date(ds);return(
+                                                    <span key={ds} style={{color:G.goldL,fontWeight:'bold',fontSize:17}}>
+                                                        🏆 {MON_KR[d.getMonth()]} {d.getDate()}일 ({DAY_KR[d.getDay()]}) — {maxC}표
+                                                    </span>
+                                                );})}
+                                            </div>
+                                        </div>
+                                    )}
+                                    <div style={card()}>
+                                        <div style={{fontSize:12,color:G.sub,marginBottom:14}}>날짜별 투표 현황</div>
+                                        {dates.map(d=>{
+                                            const ds=fmt(d), cnt=counts[ds].length, isBest=bestDs.includes(ds);
+                                            const wi=d.getDay(), isWe=wi===0||wi===6;
+                                            return(
+                                                <div key={ds} style={{marginBottom:14}}>
+                                                    <div style={{display:'flex',justifyContent:'space-between',marginBottom:5}}>
+                                                        <span style={{fontSize:14,color:isBest?G.goldL:isWe?'#cf7070':G.text,fontWeight:isBest?'bold':'normal'}}>
+                                                            {MON_KR[d.getMonth()]} {d.getDate()}일 ({DAY_KR[wi]})
+                                                        </span>
+                                                        <span style={{fontSize:14,color:isBest?G.goldL:G.sub}}>{cnt}명</span>
+                                                    </div>
+                                                    <div style={{background:'#111827',borderRadius:6,height:9,overflow:'hidden',marginBottom:5}}>
+                                                        <div style={{height:'100%',borderRadius:6,transition:'width 0.5s',
+                                                            background:isBest?`linear-gradient(90deg,${G.goldD},${G.goldL})`:'#1e3560',
+                                                            width:`${cnt/maxC*100}%`}}/>
+                                                    </div>
+                                                    {cnt>0 && (
+                                                        <div style={{display:'flex',flexWrap:'wrap',gap:4}}>
+                                                            {counts[ds].map(nm=>(
+                                                                <span key={nm} style={{background:G.accent,borderRadius:12,padding:'2px 9px',fontSize:11,color:G.sub}}>{nm}</span>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                    <div style={card()}>
+                                        <div style={{fontSize:12,color:G.sub,marginBottom:12}}>참여자 목록 ({total}명)</div>
+                                        {Object.entries(votes).map(([nm,ds])=>(
+                                            <div key={nm} style={{display:'flex',alignItems:'flex-start',padding:'10px 0',
+                                                borderBottom:`1px solid ${G.cardB}`,gap:10}}>
+                                                <span style={{color:G.text,fontSize:14,minWidth:100,paddingTop:2}}>👤 {nm}</span>
+                                                <div style={{display:'flex',flexWrap:'wrap',gap:5}}>
+                                                    {ds.sort().map(d=>{const dt=new Date(d);return(
+                                                        <span key={d} style={{background:'#0d1e0d',border:'1px solid #2a5a2a',borderRadius:12,
+                                                            padding:'3px 10px',fontSize:11,color:G.greenL}}>
+                                                            {MON_KR[dt.getMonth()]}{dt.getDate()}({DAY_KR[dt.getDay()]})
+                                                        </span>
+                                                    );})}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </>)}
+                                <div style={card({marginTop:4})}>
+                                    <div style={{fontSize:14,fontWeight:'bold',color:G.goldL,marginBottom:16}}>💬 의견 남기기</div>
+                                    <div style={{display:'flex',gap:8,marginBottom:10}}>
+                                        <input value={cmtName} onChange={e=>setCmtName(e.target.value)} placeholder="닉네임"
+                                            style={{width:110,background:G.bg,border:`1px solid ${G.cardB}`,color:G.text,
+                                                padding:'9px 11px',borderRadius:8,fontSize:13,outline:'none'}}/>
+                                        <input value={cmtText} onChange={e=>{setCmtText(e.target.value);setCmtErr('');}}
+                                            onKeyDown={e=>{if(e.key==='Enter')doComment();}} placeholder="의견을 입력하세요"
+                                            style={{flex:1,background:G.bg,border:`1px solid ${G.cardB}`,color:G.text,
+                                                padding:'9px 11px',borderRadius:8,fontSize:13,outline:'none'}}/>
+                                        <button onClick={doComment} style={{background:G.gold,color:'#000',border:'none',
+                                            borderRadius:8,padding:'9px 14px',cursor:'pointer',fontWeight:'bold',fontSize:13}}>등록</button>
+                                    </div>
+                                    {comments.map((c,i)=>(
+                                        <div key={i} style={{background:G.bg,border:`1px solid ${G.cardB}`,borderRadius:9,padding:'12px 14px', marginBottom:8}}>
+                                            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:5}}>
+                                                <span style={{fontSize:13,fontWeight:'bold',color:G.goldL}}>👤 {c.name}</span>
+                                                <span style={{fontSize:11,color:G.sub}}>{timeAgo(c.ts)}</span>
+                                            </div>
+                                            <div style={{fontSize:14,color:G.text,lineHeight:1.6}}>{c.text}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                        <div style={{textAlign:'center',marginTop:20,fontSize:11,color:G.sub,opacity:0.6}}>
+                            매주 월요일 오전 10시 ~ 화요일 오후 1시까지 투표 가능
+                        </div>
                     </div>
-                  ))}
                 </div>
-              )}
-            </div>
-          </div>
-        )}
+            );
+        }
 
-        <div style={{textAlign:'center',marginTop:20,fontSize:11,color:G.sub,opacity:0.6}}>
-          매주 월요일 오전 10시 ~ 화요일 오후 1시까지 투표 가능
-        </div>
-      </div>
-    </div>
-  );
-}
-
-ReactDOM.createRoot(document.getElementById('root')).render(
-  IS_CONFIGURED ? <App/> : <NotConfigured/>
-);
-</script>
+        ReactDOM.createRoot(document.getElementById('root')).render(
+            IS_CONFIGURED ? <App/> : <NotConfigured/>
+        );
+    </script>
 </body>
 </html>
